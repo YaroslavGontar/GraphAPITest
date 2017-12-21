@@ -61,8 +61,10 @@ namespace GrathWebAPITest
                     TokenUrl = string.Format(Constants.AuthString, AzureAd.TenantId + "/oauth2/token"),
                     Scopes = new Dictionary<string, string>
                     {
-                        { "Viewer", "Viewer have the ability to view." },
-                        { "Admin", "Admins can manage roles." }
+                        //{ "Viewer", "Viewer have the ability to view." },
+                        //{ "Admin", "Admins can manage roles." }
+                        { "Directory.ReadWrite.All", "Admins can manage roles." }
+                        
                     }
                 });
 

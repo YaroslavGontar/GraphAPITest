@@ -1,7 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
+using System.Net;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Runtime.InteropServices;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using GrathWebAPITest.Authentication;
@@ -9,12 +14,14 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.ActiveDirectory.GraphClient;
+using Microsoft.Azure.ActiveDirectory.GraphClient.Extensions;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Clients.ActiveDirectory;
+using Newtonsoft.Json.Linq;
 
 namespace GrathWebAPITest.Controllers
 {
-    [Authorize(Policy = "Admin")]
+    
     [Route("api/[controller]")]
     public class ValuesController : Controller
     {
@@ -25,35 +32,49 @@ namespace GrathWebAPITest.Controllers
             _azureAdOptions = azureAdOptions.Value;
         }
 
+        [Authorize(Policy = "Admin")]
         [HttpGet]
         public async Task<IEnumerable<string>> Get()
         {
             await CheckToken();
 
+            //_azureAdOptions.TenantId
             ActiveDirectoryClient client = AuthenticationHelper.GetActiveDirectoryClient(_azureAdOptions.TenantId);
-            var users = await client.Users.ExecuteAsync();
+            var roles = await client.Me.AppRoleAssignments.ExecuteAsync();
 
-            return users.CurrentPage.Select(user => $"{user.GivenName} {user.ObjectId}");
+            return roles.CurrentPage.Select(ARole => $"{ARole.Id} - PrincipalId:{ARole.PrincipalId} - PrincipalDisplayName:{ARole.PrincipalDisplayName} - PrincipalType:{ARole.PrincipalType} - ResourceDisplayName:{ARole.ResourceDisplayName} - ResourceId:{ARole.ResourceId}");
+
+            //return users.CurrentPage.Select(user => $"{user.GivenName} {user.ObjectId}");
             //return new string[] { me.GivenName, me.ObjectId };
         }
 
+        [Authorize(Policy = "Admin")]
         [HttpGet]
-        [Route("Applications")]
-        public async Task<IEnumerable<string>> Applications()
+        [Route("Roles")]
+        public async Task<IEnumerable<string>> Roles()
         {
             await CheckToken();
             try
             {
                 ActiveDirectoryClient client = AuthenticationHelper.GetActiveDirectoryClient(_azureAdOptions.TenantId);
-                var apps = await client.Applications.ExecuteAsync();
+                var app = await client.Applications.GetByObjectId(_azureAdOptions.ClientId).ExecuteAsync();
 
-                return apps.CurrentPage.Select(app => $"{app.DisplayName} ({string.Concat(app.AppRoles.Select(appRole => $"{appRole.Id} {appRole.Value}"))}");
+                return app.AppRoles.Select(appRole => $"{appRole.Id} {appRole.Value}");
             } catch (Exception ex)
             {
                 Console.WriteLine(ex);
                 throw ex;
             }
         }
+
+        [HttpGet]
+        [Route("Version")]
+        public string Version()
+        {
+            //RuntimeInformation.FrameworkDescription
+            return RuntimeInformation.FrameworkDescription;
+        }
+
 
         private async Task CheckToken()
         {
@@ -65,7 +86,7 @@ namespace GrathWebAPITest.Controllers
             string userName = identity.Name;
             UserAssertion userAssertion = new UserAssertion(userAccessToken, "urn:ietf:params:oauth:grant-type:jwt-bearer", userName);
 
-            string authority = $"{_azureAdOptions.Instance}{_azureAdOptions.TenantId}";
+            string authority = $"{_azureAdOptions.Instance}{_azureAdOptions.Domain}";
             //string userId = ClaimsPrincipal.Current.FindFirst(ClaimTypes.NameIdentifier).Value;
             AuthenticationContext authContext = new AuthenticationContext(authority);
 
@@ -81,10 +102,26 @@ namespace GrathWebAPITest.Controllers
         }
 
         // POST api/values
+        [Authorize(Policy = "Admin")]
         [HttpPost]
-        public void Post([FromBody]string value)
+        public async Task Post([FromBody]string value)
         {
-            // For more information on protecting this API from Cross Site Request Forgery (CSRF) attacks, see https://go.microsoft.com/fwlink/?LinkID=717803
+            await CheckToken();
+
+            //_azureAdOptions.TenantId
+            ActiveDirectoryClient client = AuthenticationHelper.GetActiveDirectoryClient(_azureAdOptions.TenantId);
+            IAppRoleAssignment appRoleAssignment = new AppRoleAssignment()
+            {
+                CreationTimestamp = DateTime.Now,
+                Id = Guid.Parse(value),
+                PrincipalDisplayName = "ygontar@objectivity.co.uk Gontar",
+                PrincipalId = Guid.Parse("c3e1f4c6-b4f9-45c1-a4f7-280346295994"),
+                PrincipalType = "User",
+                ResourceDisplayName = "GrathWebAPITest",
+                ResourceId = Guid.Parse("bfa79360-7eac-4bc3-81f2-459ea1ff9f3f")
+            };
+            await client.Me.AppRoleAssignments.AddAppRoleAssignmentAsync(appRoleAssignment);
+
         }
 
         // PUT api/values/5

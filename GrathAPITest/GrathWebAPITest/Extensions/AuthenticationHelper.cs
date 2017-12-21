@@ -36,9 +36,10 @@ namespace GrathWebAPITest.Authentication
         /// <returns>ActiveDirectoryClient for Application.</returns>
         public static ActiveDirectoryClient GetActiveDirectoryClient(string tenantId)
         {
-            Uri baseServiceUri = new Uri(new Uri(Constants.ResourceUrl), "myorganization");
+            Uri baseServiceUri = new Uri(new Uri(Constants.ResourceUrl), tenantId);
             ActiveDirectoryClient activeDirectoryClient =
                 new ActiveDirectoryClient(baseServiceUri, async () => await AcquireTokenAsync());
+
             activeDirectoryClient.Context.SendingRequest2 += Context_SendingRequest2;
             activeDirectoryClient.Context.ReceivingResponse += Context_ReceivingResponse;
             return activeDirectoryClient;
