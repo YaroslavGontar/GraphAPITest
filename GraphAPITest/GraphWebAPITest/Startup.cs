@@ -10,6 +10,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Swashbuckle.AspNetCore.Swagger;
 using GraphWebAPITest.Authentication;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 
 namespace GraphWebAPITest
 {
@@ -27,11 +30,23 @@ namespace GraphWebAPITest
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddAuthentication(sharedOptions =>
+            //services.AddAuthentication(sharedOptions =>
+            //{
+            //    sharedOptions.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
+            //})
+            //.AddAzureAdBearer(options => Configuration.Bind("AzureAd", options));
+
+            services.AddAuthentication(options =>
             {
-                sharedOptions.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+                options.DefaultChallengeScheme = OpenIdConnectDefaults.AuthenticationScheme;
             })
-            .AddAzureAdBearer(options => Configuration.Bind("AzureAd", options));
+            .AddAzureAd(options => Configuration.Bind("AzureAd", options))
+            .AddCookie();
+            //.AddOpenIdConnect(options =>
+            //{
+
+            //});
 
             services.Configure<AzureAdOptions>(Configuration.GetSection("AzureAd"));
 
@@ -53,17 +68,18 @@ namespace GraphWebAPITest
                 c.SwaggerDoc("v1", new Info { Title = "My API", Version = "v1" });
 
                 // Define the OAuth2.0 scheme that's in use (i.e. Implicit Flow)
-                c.AddSecurityDefinition("oauth2", new OAuth2Scheme
+                c.AddSecurityDefinition("OpenID Connect", new OAuth2Scheme
                 {
                     Type = "oauth2",
                     Flow = "implicit",
                     AuthorizationUrl = string.Format(Constants.AuthString, AzureAd.TenantId + Constants.OAuth2Auth),
-                    TokenUrl = string.Format(Constants.AuthString, AzureAd.TenantId + "/oauth2/token"),
+                    TokenUrl = string.Format(Constants.AuthString, AzureAd.TenantId + Constants.OAuth2Token),
                     Scopes = new Dictionary<string, string>
                     {
-                        //{ "Viewer", "Viewer have the ability to view." },
-                        //{ "Admin", "Admins can manage roles." }
-                        { "Directory.ReadWrite.All", "Admins can manage roles." }
+                    //    //OpenIdConnectConstants
+                        { "openid", "" }
+                    //////    //,{ "Admin", "Admins can manage roles." }
+                    //////    //{ "Directory.ReadWrite.All", "Admins can manage roles." }
                         
                     }
                 });
@@ -82,7 +98,10 @@ namespace GraphWebAPITest
             }
 
             var stringDict = new Dictionary<string, string>();
-            stringDict.Add("resource", AzureAd.ClientId);
+            //stringDict.Add("resource", AzureAd.ClientId);
+            //stringDict.Add("response_type", "id_token");
+            stringDict.Add("nonce", "123123");
+            //stringDict.Add("scope", "openid");
 
             app.UseSwagger();
             app.UseSwaggerUI(c =>

@@ -40,7 +40,7 @@ namespace GraphWebAPITest.Controllers
         public async Task<IEnumerable<string>> Get()
         {
             _logger.LogInformation("Check Token from logged user.");
-            await CheckToken();
+            await AuthenticationHelper.CheckToken(User.Identity as ClaimsIdentity, _azureAdOptions);
 
             _logger.LogInformation("Get Assigned roles to me.");
 
@@ -66,7 +66,10 @@ namespace GraphWebAPITest.Controllers
         [Route("Roles")]
         public async Task<IEnumerable<string>> Roles()
         {
-            await CheckToken();
+            _logger.LogInformation("Check Token from logged user.");
+            await AuthenticationHelper.CheckToken(User.Identity as ClaimsIdentity, _azureAdOptions);
+
+            _logger.LogInformation("Get Application Roles.");
             try
             {
                 ActiveDirectoryClient client = AuthenticationHelper.GetActiveDirectoryClient(_azureAdOptions.TenantId);
@@ -80,38 +83,49 @@ namespace GraphWebAPITest.Controllers
             }
         }
 
+        [Authorize(Policy = "Admin")]
         [HttpGet]
-        [Route("Version")]
-        public string Version()
+        [Route("GetAllClaims")]
+        public IEnumerable<string> GetAllClaims()
         {
-            //RuntimeInformation.FrameworkDescription
-            return RuntimeInformation.FrameworkDescription;
+            return User.Claims.Select(role => $"{role.Issuer}-{role.OriginalIssuer}-{role.Subject}-{role.Type}-{role.Value}-{role.ValueType}");
         }
 
-
-        private async Task CheckToken()
+        [Authorize(Policy = "Admin", Roles = "Admin")]
+        [HttpGet]
+        [Route("TestAdminRole")]
+        public IEnumerable<string> TestAdminRole()
         {
-            if (!string.IsNullOrEmpty(AuthenticationHelper.token)) return;
+            if (!User.IsInRole("Admin")) return new string[] { "Current user is not in Admin role." };
 
-            ClientCredential clientCred = new ClientCredential(_azureAdOptions.ClientId, _azureAdOptions.ClientSecret);
-            var identity = User.Identity as ClaimsIdentity;
-            string userAccessToken = identity.BootstrapContext as string;
-            string userName = identity.Name;
-            UserAssertion userAssertion = new UserAssertion(userAccessToken, "urn:ietf:params:oauth:grant-type:jwt-bearer", userName);
-
-            string authority = $"{_azureAdOptions.Instance}{_azureAdOptions.Domain}";
-            //string userId = ClaimsPrincipal.Current.FindFirst(ClaimTypes.NameIdentifier).Value;
-            AuthenticationContext authContext = new AuthenticationContext(authority);
-
-            var result = await authContext.AcquireTokenAsync(Authentication.Constants.ResourceUrl, clientCred, userAssertion);
-            AuthenticationHelper.token = result.AccessToken;
+            var adminRole = User.Claims.FirstOrDefault(claim => claim.Type == ClaimTypes.Role && claim.Value == "Admin");
+            if(adminRole != null)
+            {
+                return new string[] { $"{adminRole.Issuer}-{adminRole.OriginalIssuer}-{adminRole.Subject}-{adminRole.Type}-{adminRole.Value}-{adminRole.ValueType}" };
+            } else
+            {
+                _logger.LogWarning("Admin role not found!");
+                return new string[] { "Admin role not found!" };
+            }
         }
 
-        // GET api/values/5
-        [HttpGet("{id}")]
-        public string Get(int id)
+        [Authorize(Policy = "Admin", Roles = "Viewer")]
+        [HttpGet]
+        [Route("TestViewerRole")]
+        public IEnumerable<string> TestViewerRole()
         {
-            return "value";
+            if (!User.IsInRole("Viewer")) return new string[] { "Current user is not in Viewer role." };
+
+            var viewerRole = User.Claims.FirstOrDefault(claim => claim.Type == ClaimTypes.Role && claim.Value == "Viewer");
+            if (viewerRole != null)
+            {
+                return new string[] { $"{viewerRole.Issuer}-{viewerRole.OriginalIssuer}-{viewerRole.Subject}-{viewerRole.Type}-{viewerRole.Value}-{viewerRole.ValueType}" };
+            }
+            else
+            {
+                _logger.LogWarning("Viewer role not found!");
+                return new string[] { "Viewer role not found!" };
+            }
         }
 
         // POST api/values
@@ -119,9 +133,11 @@ namespace GraphWebAPITest.Controllers
         [HttpPost]
         public async Task Post([FromBody]string value)
         {
-            await CheckToken();
+            _logger.LogInformation("Check Token from logged user.");
+            await AuthenticationHelper.CheckToken(User.Identity as ClaimsIdentity, _azureAdOptions);
 
-            //_azureAdOptions.TenantId
+            _logger.LogInformation("Try to add Admin role for me.");
+
             ActiveDirectoryClient client = AuthenticationHelper.GetActiveDirectoryClient(_azureAdOptions.TenantId);
             IAppRoleAssignment appRoleAssignment = new AppRoleAssignment()
             {
@@ -134,21 +150,6 @@ namespace GraphWebAPITest.Controllers
                 ResourceId = Guid.Parse("bfa79360-7eac-4bc3-81f2-459ea1ff9f3f")
             };
             await client.Me.AppRoleAssignments.AddAppRoleAssignmentAsync(appRoleAssignment);
-
-        }
-
-        // PUT api/values/5
-        [HttpPut("{id}")]
-        public void Put(int id, [FromBody]string value)
-        {
-            // For more information on protecting this API from Cross Site Request Forgery (CSRF) attacks, see https://go.microsoft.com/fwlink/?LinkID=717803
-        }
-
-        // DELETE api/values/5
-        [HttpDelete("{id}")]
-        public void Delete(int id)
-        {
-            // For more information on protecting this API from Cross Site Request Forgery (CSRF) attacks, see https://go.microsoft.com/fwlink/?LinkID=717803
         }
     }
 }

@@ -3,16 +3,12 @@ using System.Threading.Tasks;
 using Microsoft.Azure.ActiveDirectory.GraphClient;
 using System.Configuration;
 using System.IO;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.IdentityModel.Clients.ActiveDirectory;
 
 namespace GraphWebAPITest.Authentication
 {
-    internal class Constants
-    {
-        public static string ResourceUrl = "https://graph.windows.net";
-        public static string AuthString = "https://login.microsoftonline.com/{0}";
-        public static string OAuth2Auth = "/oauth2/authorize";
-    }
-
     internal class AuthenticationHelper
     {
         public static string token;
@@ -39,22 +35,24 @@ namespace GraphWebAPITest.Authentication
             Uri baseServiceUri = new Uri(new Uri(Constants.ResourceUrl), tenantId);
             ActiveDirectoryClient activeDirectoryClient =
                 new ActiveDirectoryClient(baseServiceUri, async () => await AcquireTokenAsync());
-
-            activeDirectoryClient.Context.SendingRequest2 += Context_SendingRequest2;
-            activeDirectoryClient.Context.ReceivingResponse += Context_ReceivingResponse;
             return activeDirectoryClient;
         }
 
-        private static void Context_ReceivingResponse(object sender, System.Data.Services.Client.ReceivingResponseEventArgs e)
+        public static async Task CheckToken(ClaimsIdentity identity, AzureAdOptions azureAdOptions)
         {
-            var strReader = new StreamReader(e.ResponseMessage.GetStream());
-            var res = strReader.ReadToEnd();
-            Console.WriteLine(res);
-        }
+            if (!string.IsNullOrEmpty(token)) return;
 
-        private static void Context_SendingRequest2(object sender, System.Data.Services.Client.SendingRequest2EventArgs e)
-        {
-            Console.WriteLine(e.RequestMessage.Url);
+            ClientCredential clientCred = new ClientCredential(azureAdOptions.ClientId, azureAdOptions.ClientSecret);
+
+            string userAccessToken = identity.BootstrapContext as string;
+            string userName = identity.Name;
+            UserAssertion userAssertion = new UserAssertion(userAccessToken, "urn:ietf:params:oauth:grant-type:jwt-bearer", userName);
+
+            string authority = $"{azureAdOptions.Instance}{azureAdOptions.Domain}";
+            AuthenticationContext authContext = new AuthenticationContext(authority);
+
+            var result = await authContext.AcquireTokenAsync(Constants.ResourceUrl, clientCred, userAssertion);
+            token = result.AccessToken;
         }
     }
 }
