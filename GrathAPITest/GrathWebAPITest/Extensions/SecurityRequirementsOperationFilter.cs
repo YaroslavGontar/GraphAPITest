@@ -8,7 +8,7 @@ using Swashbuckle.AspNetCore.SwaggerGen;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authorization.Infrastructure;
 
-namespace GrathWebAPITest
+namespace GraphWebAPITest
 {
     // SecurityRequirementsOperationFilter.cs
     public class SecurityRequirementsOperationFilter : IOperationFilter

@@ -4,7 +4,7 @@ using Microsoft.Azure.ActiveDirectory.GraphClient;
 using System.Configuration;
 using System.IO;
 
-namespace GrathWebAPITest.Authentication
+namespace GraphWebAPITest.Authentication
 {
     internal class Constants
     {

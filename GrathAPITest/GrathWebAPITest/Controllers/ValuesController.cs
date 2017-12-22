@@ -9,7 +9,7 @@ using System.Net.Http.Headers;
 using System.Runtime.InteropServices;
 using System.Security.Claims;
 using System.Threading.Tasks;
-using GrathWebAPITest.Authentication;
+using GraphWebAPITest.Authentication;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -20,7 +20,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Clients.ActiveDirectory;
 using Newtonsoft.Json.Linq;
 
-namespace GrathWebAPITest.Controllers
+namespace GraphWebAPITest.Controllers
 {
     
     [Route("api/[controller]")]
