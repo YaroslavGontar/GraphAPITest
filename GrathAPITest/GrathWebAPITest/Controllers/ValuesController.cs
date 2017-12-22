@@ -15,6 +15,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.ActiveDirectory.GraphClient;
 using Microsoft.Azure.ActiveDirectory.GraphClient.Extensions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Clients.ActiveDirectory;
 using Newtonsoft.Json.Linq;
@@ -26,24 +27,36 @@ namespace GrathWebAPITest.Controllers
     public class ValuesController : Controller
     {
         AzureAdOptions _azureAdOptions;
+        private ILogger<ValuesController> _logger;
 
-        public ValuesController(IOptions<AzureAdOptions> azureAdOptions)
+        public ValuesController(ILogger<ValuesController> logger, IOptions<AzureAdOptions> azureAdOptions)
         {
-            _azureAdOptions = azureAdOptions.Value;
+            _azureAdOptions = azureAdOptions.Value ?? throw new Exception("AzureAdOptions is not initialized for class ValuesController."); ;
+            _logger = logger ?? throw new Exception("Logger is not initialized for class ValuesController.");
         }
 
         [Authorize(Policy = "Admin")]
         [HttpGet]
         public async Task<IEnumerable<string>> Get()
         {
+            _logger.LogInformation("Check Token from logged user.");
             await CheckToken();
 
-            //_azureAdOptions.TenantId
-            ActiveDirectoryClient client = AuthenticationHelper.GetActiveDirectoryClient(_azureAdOptions.TenantId);
-            var roles = await client.Me.AppRoleAssignments.ExecuteAsync();
+            _logger.LogInformation("Get Assigned roles to me.");
 
-            return roles.CurrentPage.Select(ARole => $"{ARole.Id} - PrincipalId:{ARole.PrincipalId} - PrincipalDisplayName:{ARole.PrincipalDisplayName} - PrincipalType:{ARole.PrincipalType} - ResourceDisplayName:{ARole.ResourceDisplayName} - ResourceId:{ARole.ResourceId}");
+            try
+            {
+                //_azureAdOptions.TenantId
+                ActiveDirectoryClient client = AuthenticationHelper.GetActiveDirectoryClient(_azureAdOptions.TenantId);
+                var roles = await client.Me.AppRoleAssignments.ExecuteAsync();
 
+                return roles.CurrentPage.Select(ARole => $"{ARole.Id} - PrincipalId:{ARole.PrincipalId} - PrincipalDisplayName:{ARole.PrincipalDisplayName} - PrincipalType:{ARole.PrincipalType} - ResourceDisplayName:{ARole.ResourceDisplayName} - ResourceId:{ARole.ResourceId}");
+            }
+            catch (WebException ex)
+            {
+                _logger.LogError($"WebException:{ex}");
+                throw ex;
+            }
             //return users.CurrentPage.Select(user => $"{user.GivenName} {user.ObjectId}");
             //return new string[] { me.GivenName, me.ObjectId };
         }
