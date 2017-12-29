@@ -1,18 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
+﻿using System.Collections.Generic;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Swashbuckle.AspNetCore.Swagger;
 using GraphWebAPITest.Authentication;
-using System.Security.Claims;
-using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using System.IdentityModel.Tokens.Jwt;
 
 namespace GraphWebAPITest
 {
@@ -30,19 +25,21 @@ namespace GraphWebAPITest
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            //services.AddAuthentication(sharedOptions =>
-            //{
-            //    sharedOptions.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
-            //})
-            //.AddAzureAdBearer(options => Configuration.Bind("AzureAd", options));
+            JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
 
-            services.AddAuthentication(options =>
+            services.AddAuthentication(sharedOptions =>
             {
-                options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-                options.DefaultChallengeScheme = OpenIdConnectDefaults.AuthenticationScheme;
+                sharedOptions.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
             })
-            .AddAzureAd(options => Configuration.Bind("AzureAd", options))
-            .AddCookie();
+            .AddAzureAdBearer(options => Configuration.Bind("AzureAd", options));
+
+            //services.AddAuthentication(options =>
+            //{
+            //    options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+            //    options.DefaultChallengeScheme = OpenIdConnectDefaults.AuthenticationScheme;
+            //})
+            //.AddAzureAd(options => Configuration.Bind("AzureAd", options))
+            //.AddCookie();
             //.AddOpenIdConnect(options =>
             //{
 
@@ -54,7 +51,7 @@ namespace GraphWebAPITest
             {
                 options.AddPolicy("Admin", policy =>
                 {
-                    //policy.AddAuthenticationSchemes("Cookie, Bearer");
+                    policy.AddAuthenticationSchemes("Bearer");
                     policy.RequireAuthenticatedUser();
                     //policy.RequireRole("Admin");
                     //policy.RequireClaim("editor", "contents");
@@ -68,18 +65,22 @@ namespace GraphWebAPITest
                 c.SwaggerDoc("v1", new Info { Title = "My API", Version = "v1" });
 
                 // Define the OAuth2.0 scheme that's in use (i.e. Implicit Flow)
-                c.AddSecurityDefinition("OpenID Connect", new OAuth2Scheme
+                c.AddSecurityDefinition("oauth2", new OAuth2Scheme
                 {
                     Type = "oauth2",
                     Flow = "implicit",
+                    //Extensions = new Dictionary<string, object> { ""}
+                    //Flow = "accessCode",
                     AuthorizationUrl = string.Format(Constants.AuthString, AzureAd.TenantId + Constants.OAuth2Auth),
                     TokenUrl = string.Format(Constants.AuthString, AzureAd.TenantId + Constants.OAuth2Token),
                     Scopes = new Dictionary<string, string>
                     {
-                    //    //OpenIdConnectConstants
-                        { "openid", "" }
-                    //////    //,{ "Admin", "Admins can manage roles." }
-                    //////    //{ "Directory.ReadWrite.All", "Admins can manage roles." }
+                        //OpenIdConnectConstants
+                        //{ "openid", "" },
+                        { "offline_access", ""},
+                        { "https://graph.windows.net/Directory.AccessAsUser.All", "" }
+                        //,{ "roles", "roles" }
+                        //{ "Directory.ReadWrite.All", "Admins can manage roles." }
                         
                     }
                 });
@@ -97,11 +98,11 @@ namespace GraphWebAPITest
                 app.UseDeveloperExceptionPage();
             }
 
+            app.UseStaticFiles();
+
             var stringDict = new Dictionary<string, string>();
-            //stringDict.Add("resource", AzureAd.ClientId);
-            //stringDict.Add("response_type", "id_token");
+            stringDict.Add("resource", AzureAd.ClientId);
             stringDict.Add("nonce", "123123");
-            //stringDict.Add("scope", "openid");
 
             app.UseSwagger();
             app.UseSwaggerUI(c =>
@@ -110,7 +111,7 @@ namespace GraphWebAPITest
 
                 c.ConfigureOAuth2(AzureAd.ClientId, "", "", "GrathWebAPITest", " ", stringDict);
             });
-
+            
             app.UseAuthentication();
             app.UseMvc();
         }

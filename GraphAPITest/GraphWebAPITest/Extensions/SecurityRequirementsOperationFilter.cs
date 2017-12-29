@@ -30,9 +30,10 @@ namespace GraphWebAPITest
                 .Select(attr => attr.Policy);
             var policies = controllerPolicies.Union(actionPolicies).Distinct();
             var listPol = policies.ToList();
-            var requiredClaimTypes = policies
+            var required = listPol
                 .Select(x => this.authorizationOptions.Value.GetPolicy(x))
-                .SelectMany(x => x.Requirements)
+                .SelectMany(x => x.Requirements).ToList();
+            var requiredClaimTypes = required
                 .OfType<ClaimsAuthorizationRequirement>()
                 .Select(x => x.ClaimType);
 

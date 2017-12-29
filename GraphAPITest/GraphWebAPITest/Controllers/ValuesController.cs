@@ -22,7 +22,8 @@ using Newtonsoft.Json.Linq;
 
 namespace GraphWebAPITest.Controllers
 {
-    
+
+    [Authorize(Policy = "Admin")]
     [Route("api/[controller]")]
     public class ValuesController : Controller
     {
@@ -35,7 +36,6 @@ namespace GraphWebAPITest.Controllers
             _logger = logger ?? throw new Exception("Logger is not initialized for class ValuesController.");
         }
 
-        [Authorize(Policy = "Admin")]
         [HttpGet]
         public async Task<IEnumerable<string>> Get()
         {
@@ -61,7 +61,6 @@ namespace GraphWebAPITest.Controllers
             //return new string[] { me.GivenName, me.ObjectId };
         }
 
-        [Authorize(Policy = "Admin")]
         [HttpGet]
         [Route("Roles")]
         public async Task<IEnumerable<string>> Roles()
@@ -83,7 +82,7 @@ namespace GraphWebAPITest.Controllers
             }
         }
 
-        [Authorize(Policy = "Admin")]
+        [AllowAnonymous]
         [HttpGet]
         [Route("GetAllClaims")]
         public IEnumerable<string> GetAllClaims()
@@ -129,7 +128,6 @@ namespace GraphWebAPITest.Controllers
         }
 
         // POST api/values
-        [Authorize(Policy = "Admin")]
         [HttpPost]
         public async Task Post([FromBody]string value)
         {
