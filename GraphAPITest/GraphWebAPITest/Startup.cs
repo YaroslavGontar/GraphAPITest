@@ -51,7 +51,7 @@ namespace GraphWebAPITest
             {
                 options.AddPolicy("Admin", policy =>
                 {
-                    policy.AddAuthenticationSchemes("Bearer");
+                    //policy.AddAuthenticationSchemes("Bearer");
                     policy.RequireAuthenticatedUser();
                     //policy.RequireRole("Admin");
                     //policy.RequireClaim("editor", "contents");
@@ -68,7 +68,7 @@ namespace GraphWebAPITest
                 c.AddSecurityDefinition("oauth2", new OAuth2Scheme
                 {
                     Type = "oauth2",
-                    Flow = "implicit",
+                    Flow = "accessCode",
                     //Extensions = new Dictionary<string, object> { ""}
                     //Flow = "accessCode",
                     AuthorizationUrl = string.Format(Constants.AuthString, AzureAd.TenantId + Constants.OAuth2Auth),
@@ -77,7 +77,9 @@ namespace GraphWebAPITest
                     {
                         //OpenIdConnectConstants
                         //{ "openid", "" },
-                        { "offline_access", ""},
+                        //{ "offline_access", ""},
+                        { "https://graph.windows.net/Group.ReadWrite.All", "" },
+                        { "https://graph.windows.net/Directory.ReadWrite.All", "" },
                         { "https://graph.windows.net/Directory.AccessAsUser.All", "" }
                         //,{ "roles", "roles" }
                         //{ "Directory.ReadWrite.All", "Admins can manage roles." }
