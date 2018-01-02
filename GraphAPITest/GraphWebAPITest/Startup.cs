@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Swashbuckle.AspNetCore.Swagger;
 using GraphWebAPITest.Authentication;
 using System.IdentityModel.Tokens.Jwt;
+using System;
 
 namespace GraphWebAPITest
 {
@@ -33,17 +34,7 @@ namespace GraphWebAPITest
             })
             .AddAzureAdBearer(options => Configuration.Bind("AzureAd", options));
 
-            //services.AddAuthentication(options =>
-            //{
-            //    options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-            //    options.DefaultChallengeScheme = OpenIdConnectDefaults.AuthenticationScheme;
-            //})
-            //.AddAzureAd(options => Configuration.Bind("AzureAd", options))
-            //.AddCookie();
-            //.AddOpenIdConnect(options =>
-            //{
-
-            //});
+            services.AddCors();
 
             services.Configure<AzureAdOptions>(Configuration.GetSection("AzureAd"));
 
@@ -68,21 +59,15 @@ namespace GraphWebAPITest
                 c.AddSecurityDefinition("oauth2", new OAuth2Scheme
                 {
                     Type = "oauth2",
-                    Flow = "accessCode",
-                    //Extensions = new Dictionary<string, object> { ""}
-                    //Flow = "accessCode",
+                    Flow = "implicit",
                     AuthorizationUrl = string.Format(Constants.AuthString, AzureAd.TenantId + Constants.OAuth2Auth),
                     TokenUrl = string.Format(Constants.AuthString, AzureAd.TenantId + Constants.OAuth2Token),
                     Scopes = new Dictionary<string, string>
                     {
-                        //OpenIdConnectConstants
-                        //{ "openid", "" },
-                        //{ "offline_access", ""},
-                        { "https://graph.windows.net/Group.ReadWrite.All", "" },
-                        { "https://graph.windows.net/Directory.ReadWrite.All", "" },
+                        { "DeviceManagementApps.ReadWrite.All", "" },
+                        { "DeviceManagementRBAC.ReadWrite.All", "" },
                         { "https://graph.windows.net/Directory.AccessAsUser.All", "" }
-                        //,{ "roles", "roles" }
-                        //{ "Directory.ReadWrite.All", "Admins can manage roles." }
+                        //{ "Directory.ReadWrite.All", "" }
                         
                     }
                 });
@@ -103,15 +88,15 @@ namespace GraphWebAPITest
             app.UseStaticFiles();
 
             var stringDict = new Dictionary<string, string>();
-            stringDict.Add("resource", AzureAd.ClientId);
-            stringDict.Add("nonce", "123123");
+            //stringDict.Add("resource", AzureAd.ClientId);
+            stringDict.Add("nonce", Guid.NewGuid().ToString());
 
             app.UseSwagger();
             app.UseSwaggerUI(c =>
             {
                 c.SwaggerEndpoint("/swagger/v1/swagger.json", "My API V1");
 
-                c.ConfigureOAuth2(AzureAd.ClientId, "", "", "GrathWebAPITest", " ", stringDict);
+                c.ConfigureOAuth2(AzureAd.ClientId, AzureAd.ClientSecret, Guid.NewGuid().ToString(), "GrathWebAPITest", " ", stringDict);
             });
             
             app.UseAuthentication();

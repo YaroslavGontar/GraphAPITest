@@ -5,20 +5,21 @@ var additionalQueryStringParams;
 var clientSecret;
 
 function initOAuth(e) {
-    e.tokenName = 'code';
+    //e.tokenName = 'access_token';
+    e.tokenName = 'id_token';
     clientId = e.clientId;
     scopeSeparator = e.scopeSeparator;
     additionalQueryStringParams = e.additionalQueryStringParams;
     clientSecret = e.clientSecret;
-    realm = "123";
+    realm = e.realm;
 
     window.swaggerUiAuth = window.swaggerUiAuth || {};
-    window.swaggerUiAuth.tokenName = 'code';
-    window.swaggerUiAuth.tokenUrl = window.swaggerUi.api.authSchemes.oauth2.tokenUrl;
+    window.swaggerUiAuth.tokenName = e.tokenName;
+    //window.swaggerUiAuth.tokenUrl = window.swaggerUi.api.authSchemes.oauth2.tokenUrl;
     if (!window.isOpenReplaced) {
         window.open = function (open) {
             return function (url) {
-                //url = url.replace('response_type=token', 'response_type=id_token');
+                url = url.replace('response_type=token', 'response_type=id_token');
                 console.log(url);
                 return open.call(window, url);
             };
@@ -36,13 +37,15 @@ window.processOAuthCode = function (e) {
             client_id: clientId,
             code: e.code,
             grant_type: "authorization_code",
-            redirect_uri: t
+            redirect_uri: t,
+            resource: clientId
         };
     clientSecret && (p.client_secret = clientSecret),
         $.ajax({
             url: window.swaggerUiAuth.tokenUrl,
             type: "POST",
             data: p,
+            //headers: { "Access-Control-Allow-Origin": window.oAuthRedirectUrl || a },
             success: function (e, i, n) {
                 onOAuthComplete(e, o)
             },

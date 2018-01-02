@@ -37,7 +37,7 @@ namespace GraphWebAPITest.Controllers
         }
 
         [HttpGet]
-        public async Task<IEnumerable<string>> Get()
+        public async Task<IEnumerable<IAppRoleAssignment>> Get()
         {
             _logger.LogInformation("Check Token from logged user.");
             await AuthenticationHelper.CheckToken(User.Identity as ClaimsIdentity, _azureAdOptions);
@@ -46,48 +46,80 @@ namespace GraphWebAPITest.Controllers
 
             try
             {
-                //_azureAdOptions.TenantId
                 ActiveDirectoryClient client = AuthenticationHelper.GetActiveDirectoryClient(_azureAdOptions.TenantId);
                 var roles = await client.Me.AppRoleAssignments.ExecuteAsync();
 
-                return roles.CurrentPage.Select(ARole => $"{ARole.Id} - PrincipalId:{ARole.PrincipalId} - PrincipalDisplayName:{ARole.PrincipalDisplayName} - PrincipalType:{ARole.PrincipalType} - ResourceDisplayName:{ARole.ResourceDisplayName} - ResourceId:{ARole.ResourceId}");
+                return roles.CurrentPage;
             }
             catch (WebException ex)
             {
                 _logger.LogError($"WebException:{ex}");
                 throw ex;
             }
-            //return users.CurrentPage.Select(user => $"{user.GivenName} {user.ObjectId}");
-            //return new string[] { me.GivenName, me.ObjectId };
+        }
+
+        [HttpGet]
+        [Route("Me")]
+        public async Task<IEnumerable<AssignRole>> Me()
+        {
+            _logger.LogInformation("Check Token from logged user.");
+            await AuthenticationHelper.CheckToken(User.Identity as ClaimsIdentity, _azureAdOptions);
+
+            _logger.LogInformation("Get Application Me.");
+            ActiveDirectoryClient client = AuthenticationHelper.GetActiveDirectoryClient(_azureAdOptions.TenantId);
+            var me = await client.Me.ExecuteAsync();
+
+            var obj = new AssignRole
+            {
+                PrincipalId = me.ObjectId,
+                PrincipalDisplayName = me.DisplayName,
+                PrincipalType = me.UserType
+            };
+
+            return new[] { obj };
+        }
+
+        [HttpGet]
+        [Route("Groups")]
+        public async Task<IEnumerable<AssignRole>> Groups()
+        {
+            _logger.LogInformation("Check Token from logged user.");
+            await AuthenticationHelper.CheckToken(User.Identity as ClaimsIdentity, _azureAdOptions);
+
+            _logger.LogInformation("Get Application Groups.");
+            ActiveDirectoryClient client = AuthenticationHelper.GetActiveDirectoryClient(_azureAdOptions.TenantId);
+            var groups = await client.Groups.ExecuteAsync();
+
+            return groups.CurrentPage.Select(group => new AssignRole { PrincipalId = group.ObjectId, PrincipalDisplayName = group.DisplayName, PrincipalType = group.ObjectType });
         }
 
         [HttpGet]
         [Route("Roles")]
-        public async Task<IEnumerable<string>> Roles()
+        public async Task<IEnumerable<AppRole>> Roles()
         {
             _logger.LogInformation("Check Token from logged user.");
             await AuthenticationHelper.CheckToken(User.Identity as ClaimsIdentity, _azureAdOptions);
 
             _logger.LogInformation("Get Application Roles.");
-            try
-            {
-                ActiveDirectoryClient client = AuthenticationHelper.GetActiveDirectoryClient(_azureAdOptions.TenantId);
-                var app = await client.Applications.GetByObjectId(_azureAdOptions.ClientId).ExecuteAsync();
+            ActiveDirectoryClient client = AuthenticationHelper.GetActiveDirectoryClient(_azureAdOptions.TenantId);
+            var apps = await client.Applications.ExecuteAsync();
 
-                return app.AppRoles.Select(appRole => $"{appRole.Id} {appRole.Value}");
-            } catch (Exception ex)
-            {
-                Console.WriteLine(ex);
-                throw ex;
-            }
+            return apps.CurrentPage.SelectMany(app => app.AppRoles);
         }
 
         [AllowAnonymous]
         [HttpGet]
         [Route("GetAllClaims")]
-        public IEnumerable<string> GetAllClaims()
+        public IEnumerable<SimpleClaim> GetAllClaims()
         {
-            return User.Claims.Select(role => $"{role.Issuer}-{role.OriginalIssuer}-{role.Subject}-{role.Type}-{role.Value}-{role.ValueType}");
+            return User.Claims.Select(claim => new SimpleClaim
+            {
+                Issuer = claim.Issuer,
+                OriginalIssuer = claim.OriginalIssuer,
+                Type = claim.Type,
+                Value = claim.Value,
+                ValueType = claim.ValueType
+            });
         }
 
         [Authorize(Policy = "Admin", Roles = "Admin")]
@@ -97,7 +129,7 @@ namespace GraphWebAPITest.Controllers
         {
             if (!User.IsInRole("Admin")) return new string[] { "Current user is not in Admin role." };
 
-            var adminRole = User.Claims.FirstOrDefault(claim => claim.Type == ClaimTypes.Role && claim.Value == "Admin");
+            var adminRole = User.Claims.FirstOrDefault(claim => claim.Type == "roles" && claim.Value == "Admin");
             if(adminRole != null)
             {
                 return new string[] { $"{adminRole.Issuer}-{adminRole.OriginalIssuer}-{adminRole.Subject}-{adminRole.Type}-{adminRole.Value}-{adminRole.ValueType}" };
@@ -115,7 +147,7 @@ namespace GraphWebAPITest.Controllers
         {
             if (!User.IsInRole("Viewer")) return new string[] { "Current user is not in Viewer role." };
 
-            var viewerRole = User.Claims.FirstOrDefault(claim => claim.Type == ClaimTypes.Role && claim.Value == "Viewer");
+            var viewerRole = User.Claims.FirstOrDefault(claim => claim.Type == "roles" && claim.Value == "Viewer");
             if (viewerRole != null)
             {
                 return new string[] { $"{viewerRole.Issuer}-{viewerRole.OriginalIssuer}-{viewerRole.Subject}-{viewerRole.Type}-{viewerRole.Value}-{viewerRole.ValueType}" };
@@ -129,7 +161,7 @@ namespace GraphWebAPITest.Controllers
 
         // POST api/values
         [HttpPost]
-        public async Task Post([FromBody]string value)
+        public async Task Post([FromBody]AssignRole value)
         {
             _logger.LogInformation("Check Token from logged user.");
             await AuthenticationHelper.CheckToken(User.Identity as ClaimsIdentity, _azureAdOptions);
@@ -137,17 +169,43 @@ namespace GraphWebAPITest.Controllers
             _logger.LogInformation("Try to add Admin role for me.");
 
             ActiveDirectoryClient client = AuthenticationHelper.GetActiveDirectoryClient(_azureAdOptions.TenantId);
+
             IAppRoleAssignment appRoleAssignment = new AppRoleAssignment()
             {
                 CreationTimestamp = DateTime.Now,
-                Id = Guid.Parse(value),
-                PrincipalDisplayName = "ygontar@objectivity.co.uk Gontar",
-                PrincipalId = Guid.Parse("c3e1f4c6-b4f9-45c1-a4f7-280346295994"),
-                PrincipalType = "User",
+                Id = Guid.Parse(value.RoleId),
+                PrincipalDisplayName = value.PrincipalDisplayName,
+                PrincipalId = Guid.Parse(value.PrincipalId),
+                PrincipalType = value.PrincipalType,
                 ResourceDisplayName = "GrathWebAPITest",
                 ResourceId = Guid.Parse("bfa79360-7eac-4bc3-81f2-459ea1ff9f3f")
             };
-            await client.Me.AppRoleAssignments.AddAppRoleAssignmentAsync(appRoleAssignment);
+
+            if (value.PrincipalType == "Group")
+            {
+                await client.Groups.GetByObjectId(value.PrincipalId).AppRoleAssignments.AddAppRoleAssignmentAsync(appRoleAssignment);
+            }
+            else
+            {
+                await client.Users.GetByObjectId(value.PrincipalId).AppRoleAssignments.AddAppRoleAssignmentAsync(appRoleAssignment);
+            }
         }
+    }
+
+    public class SimpleClaim
+    {
+        public string Type { get; set; }
+        public string OriginalIssuer { get; set; }
+        public string Issuer { get; set; }
+        public string ValueType { get; set; }
+        public string Value { get; set; }
+    }
+
+    public class AssignRole
+    {
+        public string PrincipalId { get; set; }
+        public string PrincipalType { get; set; }
+        public string PrincipalDisplayName { get; set; }
+        public string RoleId { get; set; }
     }
 }
