@@ -9,6 +9,7 @@ using Swashbuckle.AspNetCore.Swagger;
 using GraphWebAPITest.Authentication;
 using System.IdentityModel.Tokens.Jwt;
 using System;
+using GraphWebAPITest.Extensions;
 
 namespace GraphWebAPITest
 {
